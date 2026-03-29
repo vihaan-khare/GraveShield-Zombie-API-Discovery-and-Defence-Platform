@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GraveShield — Zombie API Defence</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0b0e11;
+      --bg2: #111418;
+      --bg3: #181c22;
+      --border: rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.13);
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --dim: #374151;
+      --red: #f43f5e;
+      --red-bg: rgba(244,63,94,0.1);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245,158,11,0.1);
+      --blue: #38bdf8;
+      --blue-bg: rgba(56,189,248,0.08);
+      --green: #34d399;
+      --green-bg: rgba(52,211,153,0.08);
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    html, body, #root { height: 100%; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.3} }
+    @keyframes scan-line { 0%{top:0} 100%{top:100%} }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+    @keyframes blink { 0%,100%{opacity:1} 49%{opacity:1} 50%{opacity:0} }
+
+    .layout { display: flex; height: 100vh; overflow: hidden; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 220px; min-width: 220px; background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; padding: 0;
+    }
+    .logo {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-mark {
+      font-family: var(--mono); font-size: 15px; font-weight: 600;
+      color: var(--text); letter-spacing: -0.5px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .logo-mark .skull { font-size: 18px; }
+    .logo-sub { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: var(--mono); letter-spacing: 1px; text-transform: uppercase; }
+
+    .nav { padding: 12px 0; flex: 1; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 20px; cursor: pointer; font-size: 13px;
+      color: var(--muted); transition: all .15s; border-left: 2px solid transparent;
+      font-family: var(--sans);
+    }
+    .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .nav-item.active { color: var(--text); border-left-color: var(--red); background: rgba(244,63,94,0.06); }
+    .nav-icon { width: 16px; text-align: center; font-size: 13px; }
+
+    .sidebar-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      font-family: var(--mono); font-size: 10px; color: var(--dim);
+    }
+    .live-dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green); margin-right: 6px;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    /* Main */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    .topbar {
+      height: 52px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; background: var(--bg2); flex-shrink: 0;
+    }
+    .topbar-title { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .5px; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+    .scan-btn {
+      font-family: var(--mono); font-size: 11px; font-weight: 600;
+      padding: 7px 16px; border-radius: 4px; cursor: pointer;
+      border: 1px solid var(--red); background: var(--red-bg);
+      color: var(--red); letter-spacing: .5px;
+      transition: all .15s; text-transform: uppercase;
+    }
+    .scan-btn:hover { background: var(--red); color: #fff; }
+    .scan-btn:disabled { opacity: .5; cursor: default; }
+    .scan-btn.scanning { border-color: var(--amber); background: var(--amber-bg); color: var(--amber); }
+
+    .content { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+    /* Stats row */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 18px 20px;
+      animation: fadeIn .3s ease both;
+    }
+    .stat-card.danger { border-color: rgba(244,63,94,0.25); }
+    .stat-card.warn   { border-color: rgba(245,158,11,0.2); }
+    .stat-card.info   { border-color: rgba(56,189,248,0.15); }
+    .stat-label { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 600; font-family: var(--mono); line-height: 1; }
+    .stat-value.red { color: var(--red); }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.blue { color: var(--blue); }
+    .stat-value.green { color: var(--green); }
+    .stat-sub { font-size: 10px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+
+    /* Progress bar */
+    .scan-progress { margin-bottom: 20px; animation: fadeIn .2s ease; }
+    .progress-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--amber); margin-bottom: 6px; }
+    .progress-track { height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--amber); border-radius: 1px; transition: width .4s ease; }
+
+    /* Table */
+    .table-section { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .table-header {
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .table-title { font-family: var(--mono); font-size: 12px; color: var(--text); font-weight: 600; letter-spacing: .3px; }
+    .table-count { font-family: var(--mono); font-size: 10px; color: var(--muted); background: var(--bg3); padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border); }
+
+    .filter-row { display: flex; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+    .filter-btn {
+      font-family: var(--mono); font-size: 10px; padding: 4px 10px; border-radius: 3px;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      cursor: pointer; transition: all .15s; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .filter-btn:hover { border-color: var(--border2); color: var(--text); }
+    .filter-btn.active { background: var(--red-bg); border-color: rgba(244,63,94,0.4); color: var(--red); }
+    .filter-btn.active.amber { background: var(--amber-bg); border-color: rgba(245,158,11,0.4); color: var(--amber); }
+    .filter-btn.active.blue { background: var(--blue-bg); border-color: rgba(56,189,248,0.3); color: var(--blue); }
+    .filter-btn.active.green { background: var(--green-bg); border-color: rgba(52,211,153,0.3); color: var(--green); }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 10px 16px; text-align: left; font-family: var(--mono); font-size: 10px;
+      color: var(--muted); font-weight: 500; letter-spacing: .8px; text-transform: uppercase;
+      border-bottom: 1px solid var(--border); background: var(--bg3);
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s;
+      animation: fadeIn .25s ease both;
+    }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    tbody tr.selected { background: rgba(244,63,94,0.05); border-left: 2px solid var(--red); }
+    tbody tr:last-child { border-bottom: none; }
+    td { padding: 11px 16px; font-size: 13px; vertical-align: middle; }
+
+    .ep-cell { font-family: var(--mono); font-size: 12px; color: var(--text); }
+    .ep-service { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+
+    .method-badge {
+      font-family: var(--mono); font-size: 10px; font-weight: 600;
+      padding: 2px 7px; border-radius: 3px; display: inline-block;
+    }
+    .m-GET  { background: var(--blue-bg);  color: var(--blue);  border: 1px solid rgba(56,189,248,0.2); }
+    .m-POST { background: var(--green-bg); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
+    .m-PUT  { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+    .m-DELETE { background: var(--red-bg); color: var(--red);   border: 1px solid rgba(244,63,94,0.2); }
+
+    .age-cell { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+    .age-cell.old { color: var(--red); }
+    .age-cell.mid { color: var(--amber); }
+
+    .score-cell { display: flex; align-items: center; gap: 10px; }
+    .score-bar { flex: 1; height: 3px; background: var(--border); border-radius: 2px; min-width: 60px; }
+    .score-fill { height: 100%; border-radius: 2px; }
+    .score-num { font-family: var(--mono); font-size: 12px; font-weight: 600; min-width: 28px; text-align: right; }
+
+    .status-pill {
+      font-family: var(--mono); font-size: 10px; font-weight: 500;
+      padding: 3px 8px; border-radius: 3px; display: inline-flex; align-items: center; gap: 5px;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .s-critical { background: var(--red-bg);   color: var(--red);   border: 1px solid rgba(244,63,94,0.25); }
+    .s-high     { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+    .s-shadow   { background: var(--blue-bg);  color: var(--blue);  border: 1px solid rgba(56,189,248,0.2); }
+    .s-stale    { background: var(--bg3);      color: var(--muted); border: 1px solid var(--border2); }
+
+    .pill-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse-dot 2s ease infinite; }
+
+    /* Detail Panel */
+    .detail-panel {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 6px; margin-top: 16px;
+      animation: fadeIn .2s ease;
+    }
+    .detail-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .detail-ep { font-family: var(--mono); font-size: 13px; color: var(--text); font-weight: 600; }
+    .detail-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 0 4px; }
+    .detail-close:hover { color: var(--text); }
+    .detail-body { padding: 20px; }
+    .detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+    .detail-field .df-label { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 5px; }
+    .detail-field .df-value { font-family: var(--mono); font-size: 13px; color: var(--text); }
+    .detail-field .df-value.bad { color: var(--red); }
+    .detail-field .df-value.warn { color: var(--amber); }
+    .detail-field .df-value.ok  { color: var(--green); }
+
+    .detail-actions { display: flex; gap: 10px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .action-btn {
+      font-family: var(--mono); font-size: 11px; font-weight: 500;
+      padding: 8px 16px; border-radius: 4px; cursor: pointer;
+      border: 1px solid var(--border2); background: transparent; color: var(--text);
+      transition: all .15s; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .action-btn:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.2); }
+    .action-btn.red { border-color: rgba(244,63,94,0.4); color: var(--red); }
+    .action-btn.red:hover { background: var(--red-bg); }
+    .action-btn.amber { border-color: rgba(245,158,11,0.35); color: var(--amber); }
+    .action-btn.amber:hover { background: var(--amber-bg); }
+    .action-btn.blue { border-color: rgba(56,189,248,0.3); color: var(--blue); }
+    .action-btn.blue:hover { background: var(--blue-bg); }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 6px; padding: 12px 18px;
+      font-family: var(--mono); font-size: 12px; color: var(--text);
+      animation: fadeIn .2s ease;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      z-index: 999; max-width: 320px;
+    }
+    .toast .toast-title { color: var(--green); font-weight: 600; margin-bottom: 3px; }
+
+    /* Log feed */
+    .log-feed {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 4px; padding: 12px 14px; margin-top: 16px;
+      font-family: var(--mono); font-size: 11px; color: var(--muted);
+      max-height: 120px; overflow-y: auto;
+    }
+    .log-line { margin-bottom: 3px; line-height: 1.6; }
+    .log-line .ts { color: var(--dim); margin-right: 8px; }
+    .log-line .log-red { color: var(--red); }
+    .log-line .log-amber { color: var(--amber); }
+    .log-line .log-green { color: var(--green); }
+    .log-line .log-blue { color: var(--blue); }
+
+    .cursor { display: inline-block; animation: blink 1s step-end infinite; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+    .empty-skull { font-size: 40px; margin-bottom: 16px; opacity: .3; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const APIS = [
+  { id:1, ep:'/api/v1/legacy-users',       service:'user-service',    method:'GET',    days:312, score:94, risk:'critical', status:'dead',   auth:'None',                  owner:'Unknown',              sens:'PII / High',           calls:0,  schema:'v1 (2019)', cve:'CVE-2021-44228', notes:'No auth, no owner, 0 calls in 300+ days. Highest priority.' },
+  { id:2, ep:'/internal/debug/exec',        service:'core-api',        method:'POST',   days:421, score:99, risk:'critical', status:'dead',   auth:'None',                  owner:'Unknown',              sens:'System / Critical',    calls:0,  schema:'Undoc.',    cve:'CVE-2023-46604', notes:'Remote exec endpoint. Should never be exposed. Shut down immediately.' },
+  { id:3, ep:'/api/v1/payments/refund',     service:'payments-svc',    method:'POST',   days:187, score:81, risk:'critical', status:'dead',   auth:'Basic (deprecated)',    owner:'Payments (disbanded)', sens:'Financial / Critical', calls:3,  schema:'v2 (2020)', cve:'None',           notes:'Deprecated auth scheme. 3 mystery calls in 90 days — possible probing.' },
+  { id:4, ep:'/api/v1/admin/roles',         service:'auth-service',    method:'PUT',    days:156, score:72, risk:'high',     status:'stale',  auth:'JWT (expired keys)',    owner:'Platform',             sens:'Auth / High',          calls:5,  schema:'v1 (2021)', cve:'None',           notes:'Signing keys rotated but endpoint still accepts old tokens.' },
+  { id:5, ep:'/webhook/v1/stripe',          service:'payments-svc',    method:'POST',   days:210, score:68, risk:'high',     status:'shadow', auth:'HMAC',                  owner:'Payments',             sens:'Financial / High',     calls:7,  schema:'v1 (2020)', cve:'None',           notes:'Currently shadow proxied. Monitoring for replay attacks.' },
+  { id:6, ep:'/api/v2/user-export',         service:'data-pipeline',   method:'GET',    days:94,  score:58, risk:'high',     status:'stale',  auth:'API Key',               owner:'Data team',            sens:'PII / High',           calls:12, schema:'v2 (2021)', cve:'None',           notes:'API key rotated 6 months ago but old key still accepted.' },
+  { id:7, ep:'/api/v3/analytics/raw',       service:'analytics-svc',   method:'GET',    days:62,  score:41, risk:'medium',   status:'shadow', auth:'Bearer',                owner:'Analytics',            sens:'Behavioural / Med',    calls:28, schema:'v3 (2022)', cve:'None',           notes:'Shadow proxied. Low risk but data volume warrants monitoring.' },
+  { id:8, ep:'/api/v1/notifications/push',  service:'notification-svc',method:'POST',   days:278, score:44, risk:'medium',   status:'stale',  auth:'Bearer',                owner:'Mobile (left)',        sens:'Personal / Med',       calls:9,  schema:'v1 (2020)', cve:'None',           notes:'Owner team disbanded. No current consumer identified.' },
+];
+
+const SCAN_STEPS = [
+  ['blue',  'Initialising passive traffic tap...'],
+  ['blue',  'Parsing OpenAPI / Swagger specs...'],
+  ['amber', 'Checking authentication enforcement...'],
+  ['amber', 'Cross-referencing ownership registry...'],
+  ['amber', 'Running call frequency analysis...'],
+  ['red',   'Anomaly detection model running...'],
+  ['red',   'Computing CVSS-weighted risk scores...'],
+  ['green', 'Flagging zombie candidates...'],
+  ['green', 'Scan complete — 8 zombies found.'],
+];
+
+const scoreColor = s => s >= 80 ? '#f43f5e' : s >= 55 ? '#f59e0b' : '#38bdf8';
+const ageClass   = d => d > 200 ? 'old' : d > 90 ? 'mid' : '';
+
+const METHOD = ({ m }) => <span className={`method-badge m-${m}`}>{m}</span>;
+
+const StatusPill = ({ status, risk }) => {
+  const map = {
+    dead:   ['s-critical','Dead'],
+    stale:  ['s-high','Stale'],
+    shadow: ['s-shadow','Shadow'],
+  };
+  const [cls, label] = map[status] || ['s-stale','Unknown'];
+  return <span className={`status-pill ${cls}`}><span className="pill-dot"/>{label}</span>;
+};
+
+function DetailPanel({ api, onClose, onAction }) {
+  return (
+    <div className="detail-panel">
+      <div className="detail-header">
+        <span className="detail-ep">{api.ep}</span>
+        <button className="detail-close" onClick={onClose}>✕</button>
+      </div>
+      <div className="detail-body">
+        <div className="detail-grid">
+          <div className="detail-field"><div className="df-label">Auth enforced</div><div className={`df-value ${api.auth === 'None' ? 'bad' : api.auth.includes('deprecated') || api.auth.includes('expired') ? 'warn' : 'ok'}`}>{api.auth}</div></div>
+          <div className="detail-field"><div className="df-label">Owner team</div><div className={`df-value ${api.owner === 'Unknown' || api.owner.includes('disbanded') || api.owner.includes('left') ? 'bad' : ''}`}>{api.owner}</div></div>
+          <div className="detail-field"><div className="df-label">Data sensitivity</div><div className={`df-value ${api.sens.includes('Critical') ? 'bad' : api.sens.includes('High') ? 'warn' : ''}`}>{api.sens}</div></div>
+          <div className="detail-field"><div className="df-label">Calls / 30d</div><div className={`df-value ${api.calls === 0 ? 'bad' : 'ok'}`}>{api.calls}</div></div>
+          <div className="detail-field"><div className="df-label">Schema version</div><div className="df-value warn">{api.schema}</div></div>
+          <div className="detail-field"><div className="df-label">CVE matches</div><div className={`df-value ${api.cve !== 'None' ? 'bad' : 'ok'}`}>{api.cve}</div></div>
+        </div>
+        <div className="detail-field" style={{marginBottom:16}}><div className="df-label">Analysis</div><div className="df-value" style={{color:'#9ca3af',fontSize:12,lineHeight:1.6}}>{api.notes}</div></div>
+        <div className="detail-actions">
+          <button className="action-btn blue" onClick={() => onAction('shadow', api)}>Enable Shadow Proxy</button>
+          <button className="action-btn amber" onClick={() => onAction('throttle', api)}>Throttle Access</button>
+          <button className="action-btn red" onClick={() => onAction('deprecate', api)}>Deprecate Endpoint</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [view, setView] = useState('dashboard');
+  const [scanning, setScanning] = useState(false);
+  const [scanStep, setScanStep] = useState(0);
+  const [scanDone, setScanDone] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [logs, setLogs] = useState([
+    { color:'green', text:'System online. Last scan: 2h ago.' },
+    { color:'amber', text:'3 critical endpoints detected.' },
+    { color:'blue',  text:'Shadow proxy active on 2 endpoints.' },
+  ]);
+  const [toast, setToast] = useState(null);
+  const [apiStates, setApiStates] = useState({});
+  const logRef = useRef();
+
+  const addLog = (color, text) => {
+    const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
+    setLogs(l => [...l.slice(-30), { color, text, ts }]);
+  };
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [logs]);
+
+  const runScan = () => {
+    if (scanning) return;
+    setScanning(true); setScanDone(false); setScanStep(0); setSelected(null);
+    addLog('blue', 'New scan initiated...');
+    let i = 0;
+    const iv = setInterval(() => {
+      setScanStep(i + 1);
+      addLog(SCAN_STEPS[i][0], SCAN_STEPS[i][1]);
+      i++;
+      if (i >= SCAN_STEPS.length) {
+        clearInterval(iv);
+        setTimeout(() => { setScanning(false); setScanDone(true); }, 400);
+      }
+    }, 480);
+  };
+
+  const handleAction = (action, api) => {
+    const msgs = {
+      shadow:    ['blue',  `Shadow proxy enabled on ${api.ep}`, 'Shadow proxy active — all traffic mirrored and logged.'],
+      throttle:  ['amber', `Throttle applied to ${api.ep}`,     'Rate limit set to 5 req/min. Alerts enabled.'],
+      deprecate: ['red',   `${api.ep} marked for deprecation`,  'Endpoint flagged. Team notified. Grace period: 14d.'],
+    };
+    const [color, log, toastMsg] = msgs[action];
+    addLog(color, log);
+    setApiStates(s => ({ ...s, [api.id]: action }));
+    setToast({ title: action.charAt(0).toUpperCase() + action.slice(1), msg: toastMsg });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const filtered = APIS.filter(a => filter === 'all' || a.risk === filter || a.status === filter);
+  const progress = Math.round((scanStep / SCAN_STEPS.length) * 100);
+
+  return (
+    <div className="layout">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <div className="logo">
+          <div className="logo-mark"><span className="skull">☠</span> GraveShield</div>
+          <div className="logo-sub">Zombie API Defence</div>
+        </div>
+        <nav className="nav">
+          {[
+            ['dashboard','◈','Dashboard'],
+            ['endpoints','⊞','Endpoints'],
+            ['alerts','⚠','Alerts'],
+            ['logs','≡','Audit Logs'],
+          ].map(([v, icon, label]) => (
+            <div key={v} className={`nav-item${view===v?' active':''}`} onClick={() => setView(v)}>
+              <span className="nav-icon">{icon}</span>{label}
+            </div>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <span className="live-dot"/>LIVE MONITOR<br/>
+          <span style={{marginTop:4,display:'block'}}>v0.1 · hackathon build</span>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div className="main">
+        <div className="topbar">
+          <span className="topbar-title">
+            {view === 'dashboard' && 'OVERVIEW / DASHBOARD'}
+            {view === 'endpoints' && 'ENDPOINT REGISTRY'}
+            {view === 'alerts'    && 'ACTIVE ALERTS'}
+            {view === 'logs'      && 'AUDIT LOGS'}
+          </span>
+          <div className="topbar-right">
+            <button
+              className={`scan-btn${scanning?' scanning':''}`}
+              onClick={runScan} disabled={scanning}
+            >
+              {scanning ? `Scanning... ${progress}%` : 'Run Scan ▶'}
+            </button>
+          </div>
+        </div>
+
+        <div className="content">
+          {scanning && (
+            <div className="scan-progress">
+              <div className="progress-header">
+                <span>{SCAN_STEPS[Math.max(scanStep-1,0)][1]}<span className="cursor">_</span></span>
+                <span>{progress}%</span>
+              </div>
+              <div className="progress-track"><div className="progress-fill" style={{width:`${progress}%`}}/></div>
+            </div>
+          )}
+
+          {/* Stats */}
+          <div className="stats">
+            <div className="stat-card danger">
+              <div className="stat-label">Zombie APIs</div>
+              <div className="stat-value red">{APIS.filter(a=>a.status==='dead').length}</div>
+              <div className="stat-sub">No calls in 90+ days</div>
+            </div>
+            <div className="stat-card warn">
+              <div className="stat-label">High Risk</div>
+              <div className="stat-value amber">{APIS.filter(a=>a.risk==='critical'||a.risk==='high').length}</div>
+              <div className="stat-sub">Score ≥ 55</div>
+            </div>
+            <div className="stat-card info">
+              <div className="stat-label">Shadow Proxied</div>
+              <div className="stat-value blue">{APIS.filter(a=>a.status==='shadow').length}</div>
+              <div className="stat-sub">Traffic mirrored</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Scanned</div>
+              <div className="stat-value green">42</div>
+              <div className="stat-sub">Total endpoints</div>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="table-section">
+            <div className="table-header">
+              <span className="table-title">Flagged Endpoints</span>
+              <span className="table-count">{filtered.length} of {APIS.length}</span>
+            </div>
+            <div className="filter-row">
+              {[['all','All'],['critical','Critical'],['high','High'],['medium','Medium'],['shadow','Shadow']].map(([v,l])=>(
+                <button key={v}
+                  className={`filter-btn${filter===v?' active'+(v==='critical'?'':(v==='high'?' amber':(v==='medium'?' blue':(v==='shadow'?' blue':'')))):''}` }
+                  onClick={() => { setFilter(v); setSelected(null); }}
+                >{l}</button>
+              ))}
+            </div>
+            {filtered.length === 0 ? (
+              <div className="empty-state"><div className="empty-skull">☠</div>No endpoints match this filter.</div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th>Last seen</th>
+                    <th>Risk score</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((a,i) => (
+                    <tr key={a.id}
+                      style={{animationDelay:`${i*40}ms`}}
+                      className={selected?.id === a.id ? 'selected' : ''}
+                      onClick={() => setSelected(selected?.id === a.id ? null : a)}
+                    >
+                      <td>
+                        <div className="ep-cell">{a.ep}</div>
+                        <div className="ep-service">{a.service}</div>
+                      </td>
+                      <td><METHOD m={a.method}/></td>
+                      <td><span className={`age-cell ${ageClass(a.days)}`}>{a.days}d ago</span></td>
+                      <td>
+                        <div className="score-cell">
+                          <div className="score-bar"><div className="score-fill" style={{width:`${a.score}%`,background:scoreColor(a.score)}}/></div>
+                          <span className="score-num" style={{color:scoreColor(a.score)}}>{a.score}</span>
+                        </div>
+                      </td>
+                      <td><StatusPill status={apiStates[a.id]==='shadow'?'shadow':a.status} risk={a.risk}/></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Detail panel */}
+          {selected && (
+            <DetailPanel api={selected} onClose={() => setSelected(null)} onAction={handleAction}/>
+          )}
+
+          {/* Log feed */}
+          <div className="log-feed" ref={logRef}>
+            {logs.map((l,i) => (
+              <div key={i} className="log-line">
+                {l.ts && <span className="ts">[{l.ts}]</span>}
+                <span className={`log-${l.color}`}>{l.text}</span>
+              </div>
+            ))}
+            {scanning && <div className="log-line"><span className="log-amber">Processing<span className="cursor">_</span></span></div>}
+          </div>
+        </div>
+      </div>
+
+      {toast && (
+        <div className="toast">
+          <div className="toast-title">✓ {toast.title} applied</div>
+          <div style={{color:'#9ca3af',fontSize:11}}>{toast.msg}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
